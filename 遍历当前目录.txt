@@ -1,0 +1,10 @@
+@echo off &setlocal enabledelayedexpansion  
+::设置变量延迟
+for /r %%a in (*) do (
+   set /a num+=1
+   set str=%%a
+   set str=!str:%cd%=!
+   echo 文件的相对路径是:!str!
+)
+echo 文件的个数是%num%
+pause

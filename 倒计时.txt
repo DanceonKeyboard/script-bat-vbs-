@@ -1,0 +1,10 @@
+@echo off &color 0A
+for /L %%a in (
+3,-1,0
+) do (
+echo 3秒后将自动关闭本窗口
+echo 还剩余 %%a 秒
+ping -n 2 localhost 1>nul 2>nul
+cls
+)
+exit
