@@ -1,0 +1,124 @@
+Option Explicit
+
+Const SvrName = "smtp.qq.com"    'SMTP服务器
+Const SvrPort = "25"             'SMTP服务器端口
+Const Username = "xxx@qq.com"    '邮件用户账号，这里填写你的QQ号码
+Const Password = "asdfsdfhlxfdffdfd"  'QQ邮箱SMTP授权码
+Const MailFrom = "xxx@qq.com"    '你的邮箱地址，如 QQ号码@qq.com
+Const MailTo = "yyy@qq.com"      '对方邮箱地址
+Const Subject = "NetCenterIP 当前 IP 为 {当前IP}，发送于 {现在时间}"   '使用{当前IP}、{现在时间}标签来获取动态数据
+Const Message = "^o^"
+
+
+Main        
+Sub Main()
+  Dim CurIP, LastIP, strSubject, strMessage
+  Do
+    CurIP = GetWWWIP()      '获取当前IP
+    If CurIP <> LastIP Then    'IP变化时，发送IP到邮箱
+      LastIP = CurIP
+      strSubject = Replace(Subject, "{当前IP}", CurIP)
+      strSubject = Replace(strSubject, "{现在时间}", FormatDT(Now(),"{y}/{M}/{D} {h}:{n}"))
+      strMessage = Replace(Message, "{当前IP}", CurIP)
+      strMessage = Replace(strMessage, "{现在时间}", FormatDT(Now(),"{y}/{M}/{D} {h}:{n}"))
+      Call SendMail(SvrName, SvrPort, Username, Password, _
+        MailFrom, MailTo, strSubject, strMessage)
+    End If
+    WScript.Sleep 5 * 1000
+  Loop
+End Sub
+
+
+'发邮件，可指定附件(文件路径数组)
+Function SendMail(strSvrName, strSvrPort, strUsername, strPassword, _
+  strFrom, strTo, strSubject, strMessage)
+  Const schema = "http://schemas.microsoft.com/cdo/configuration/"
+  Dim Check, Email, strAttachment
+  Check = False
+  On Error Resume Next
+  Do Until Check = True
+    Set Email = CreateObject("CDO.Message")
+    Email.BodyPart.Charset = "utf-8"  '邮件内容编码
+    Email.From = strFrom        '发送邮箱地址
+    Email.To = strTo          '接收邮箱地址
+    Email.Subject = strSubject      '这是邮件主题
+    Email.Textbody = strMessage      '这是邮件内容
+    With Email.Configuration.Fields
+      .Item(schema & "sendusing") = 2
+      .Item(schema & "smtpserver") = strSvrName        '这里写SMTP服务器
+      .Item(schema & "smtpserverport") = strSvrPort      '这里写SMTP服务器端口
+      .Item(schema & "smtpauthenticate") = 1
+      .Item(schema & "sendusername") = strUsername      '发送邮箱账号
+      .Item(schema & "sendpassword") = strPassword      '发送邮箱密码
+      .Item(schema & "smtpconnectiontimeout") = 60 ''300      '服务器连接超时
+      .Update
+    End With
+    Err.Clear
+    Email.Send
+    If Err.Number = 0 Then Check = True
+    Set Email = Nothing
+    WScript.Sleep 200
+  Loop
+End Function
+
+
+'获取外网IPv4，强制等待获取正确IP
+Function GetWWWIP()
+  Dim Check, objHttp, strHtml, re
+  Check = False
+  On Error Resume Next
+  Do Until Check = True
+    Set objHttp = CreateObject("WinHttp.WinHttpRequest.5.1")
+    objHttp.SetTimeouts 5000,5000,5000,5000  'ResolveTimeout,ConnectTimeout,SendTimeout,ReceiveTimeout
+    objHttp.Open "GET", "http://www.bathome.net/s/ip.php", False
+    objHttp.Send
+    If objHttp.Status = 200 Then
+      strHtml = objHttp.ResponseText()
+      Set re = CreateObject("vbScript.regExp")
+      re.Pattern = "(\d+\.\d+\.\d+\.\d+)"
+      If re.Test(strHtml) Then
+        GetWWWIP = re.Execute(strHtml)(0).SubMatches(0)
+        Check = True
+      End If
+    End If
+    Set re = Nothing
+    Set objHttp = Nothing
+    WScript.Sleep 200
+  Loop
+End Function
+
+
+'FormatDT 日期时间格式化 By Abo(wupwu@qq.com) 2008.09.07
+'参数：DateTime 日期时间, Template 格式化模板 
+'备注：Template 模板标签注释 {Y}:年 {y}:2位年 {M}:月 {m}:补位月，例：01,02 {ME}:英文月份 {Me}:英文月份缩写 {D}:日 {d}:补位日
+'{W}:星期几英文 {w}:星期几英文缩写 {H}:时 {h}:补位时 {N}:分 {n}:补位分 {S}:秒 {s}:补位秒
+Function FormatDT(DateTime, Template)
+  If StringToDate(DateTime) = "" Or Trim(Template) = "" Then FormatDT = Template  : Exit Function
+  DateTime = StringToDate(DateTime)
+  Dim dtmY,dtmM,dtmD,dtmH ,dtmN,dtmS,dtmW,arrFW,arrSW,arrFM,arrSM
+  dtmY=Year(DateTime)  : dtmM=Month(DateTime)  : dtmD=Day(DateTime)  : dtmW=WeekDay(DateTime)
+  dtmH=Hour(DateTime)  : dtmN=Minute(DateTime)  : dtmS=Second(DateTime)
+  arrFW = Array("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+  arrSW = Array("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+  arrFM = Array("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+  arrSM = Array("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+  Template = Replace(Template,"{Y}",dtmY)  : Template = Replace(Template,"{y}",Right(dtmY,2))
+  Template = Replace(Template,"{M}",dtmM)  : Template = Replace(Template,"{m}",Right("00"&dtmM ,2))
+  Template = Replace(Template,"{ME}",arrFM(dtmM-1))  : Template = Replace(Template,"{Me}",arrSM(dtmM-1))
+  Template = Replace(Template,"{D}",dtmD)  : Template = Replace(Template,"{d}",Right("00"&dtmD,2))
+  Template = Replace(Template,"{H}",dtmH )  : Template = Replace(Template,"{h}",Right("00"&dtmH ,2))
+  Template = Replace(Template,"{N}",dtmN)  : Template = Replace(Template,"{n}",Right("00"&dtmN,2))
+  Template = Replace(Template,"{S}",dtmS)  : Template = Replace(Template,"{s}",Right("00"&dtmS,2))
+  Template = Replace(Template,"{W}",arrFW(dtmW-1))  : Template = Replace(Template,"{w}",arrSW(dtmW-1))
+  FormatDT = Template
+End Function
+'StringToDate 日期字符串转日期 (修正系统日期分隔符不同的问题) By Yu2n 2014.12.10
+Function StringToDate(ByVal strDate)    
+  If IsDate(strDate) Then StringToDate = CDate(strDate)  : Exit Function
+  Dim s1, s2
+  For Each s1 In Split(". - /")
+    For Each s2 In Split(". - /")
+      If IsDate(Replace(strDate,s1,s2)) Then StringToDate = CDate(Replace(strDate,s1,s2))  : Exit Function
+    Next
+  Next
+End Function
